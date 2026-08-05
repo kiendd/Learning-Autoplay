@@ -22,9 +22,12 @@ In scope:
 - Dismiss blocking dialogs that overlay the player ("still watching?").
 - Advance to the next lesson when a video ends.
 - Preserve playback rate across resumes and lesson changes.
-- Popup with an ON/OFF switch and a resume counter.
+- Popup with a single ON/OFF switch and a resume counter.
 - Badge on the extension icon reflecting state.
 - Brief on-video toast when a resume happens.
+
+All four playback behaviors are governed by that one switch; there are no
+per-behavior settings.
 
 Out of scope:
 
@@ -120,19 +123,32 @@ The ON/OFF switch stays responsive during the cooldown.
 
 ### Lesson end
 
-On `ended`, do not resume. If next-lesson advance is enabled, call `goNext()`.
+On `ended`, do not resume; call `goNext()` instead. There is no separate setting
+for this — the single ON/OFF switch governs all four behaviors.
 
 ### Blocking modal
 
-While the video is paused, look for a visible dialog overlaying the player and
-click the button whose text matches
-`/tiếp tục|continue|resume|still watching|keep watching/i`. Text matching is used
-instead of class names because LinkedIn's class names change frequently.
+Checked on two triggers: the `pause` path, and each watchdog tick while the video
+is paused. Look for a visible dialog overlaying the player and click the button
+whose text matches `/tiếp tục|continue|resume|still watching|keep watching/i`.
+Text matching is used instead of class names because LinkedIn's class names change
+frequently.
 
 ### Playback rate
 
-Remember the observed rate in storage. After a resume or lesson change, if the
-rate has reset, restore the remembered value. No UI.
+Record the rate on every `ratechange` event that fires while the video is playing,
+storing it in `chrome.storage.sync`. After a resume or a lesson change, if the
+current rate differs from the stored value, set it back. No UI.
+
+### Toast and badge
+
+The toast appears on a successful resume, and on the two failure states (play
+blocked, cooldown engaged). It does not appear for modal dismissal or lesson
+advance — those are silent.
+
+The badge shows the resume count while ON, is empty while OFF, and shows `!` when
+play is blocked. The count is per-tab and resets on page reload; the popup shows
+the same number.
 
 ## Error Handling
 
