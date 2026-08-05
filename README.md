@@ -130,7 +130,15 @@ The resume path needs no LinkedIn-specific selector — it uses
 **"still watching" dialog** are matched by CSS selectors that LinkedIn changes
 from time to time.
 
-To see what the extension is matching, run this in the page console on a lesson:
+**Quickest check:** paste the whole of `tools/diagnose.js` into the DevTools
+console on a real lesson. It reports which selector matched what, lists every
+visible button label so a failed match can be corrected in one go, and copies
+the result to the clipboard. It re-applies the selectors from the page rather
+than reading the extension, because content scripts run in an isolated world the
+page console cannot see. `test/diagnose.test.js` fails if its copy of the
+selectors drifts from `player.js`.
+
+**For a running commentary instead**, set this in the page console:
 
     localStorage.llAutoResumeDebug = '1'
 
@@ -155,6 +163,7 @@ Turn logging off with:
 | `src/content/index.js` | Wires the pieces, attaches listeners, runs the 2s watchdog. |
 | `src/background/worker.js` | Renders the toolbar badge, and reports screen lock (`chrome.idle` is not reachable from a content script). |
 | `src/popup/` | Status line, two switches, the speed dropdown, the counters. |
+| `tools/diagnose.js` | Pasted into the page console to report what the selectors match. |
 
 The split exists so that the fragile part (selectors) is isolated from the part
 worth testing (logic), and so a LinkedIn redesign only requires editing
