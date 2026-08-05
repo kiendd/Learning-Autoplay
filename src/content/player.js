@@ -21,6 +21,22 @@
 
   const MODAL_BUTTON_PATTERN = /tiếp tục|continue|resume|still watching|keep watching/i;
 
+  // The Previous/Next pair at the foot of a text lesson carries no aria-label and
+  // its class names are build hashes (`_button_ps32ck`) that change on every
+  // LinkedIn deploy, so match the label instead. Anchored at the start so
+  // "Previous" can never match.
+  const PAGE_NEXT_PATTERN = /^(next|tiếp theo|kế tiếp)\b/i;
+
+  function labelOf(element) {
+    return (element.textContent || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function isClickable(element) {
+    if (element.disabled) return false;
+    if (element.getAttribute('aria-disabled') === 'true') return false;
+    return isVisible(element);
+  }
+
   function queryFirst(selectorList) {
     for (const selector of selectorList) {
       const element = document.querySelector(selector);
@@ -52,6 +68,34 @@
 
     return {
       getVideo: findVideo,
+
+      hasVideo() {
+        return findVideo() !== null;
+      },
+
+      getLocation() {
+        return window.location.href;
+      },
+
+      // The Next button on a text or document lesson, which has no `ended`
+      // event to advance on.
+      findPageNextButton() {
+        const candidates = Array.from(document.querySelectorAll('button, a[role="button"]'));
+        const match = candidates.find(
+          (element) => isClickable(element) && PAGE_NEXT_PATTERN.test(labelOf(element)),
+        );
+        if (!match) {
+          log('no page Next button on this lesson');
+          return null;
+        }
+        return {
+          click() {
+            log('clicking the page Next button:', labelOf(match));
+            match.click();
+            return true;
+          },
+        };
+      },
 
       isPaused() {
         const video = findVideo();
@@ -131,4 +175,5 @@
   window.__llAutoResume.createDomPlayer = createDomPlayer;
   window.__llAutoResume.SELECTORS = SELECTORS;
   window.__llAutoResume.MODAL_BUTTON_PATTERN = MODAL_BUTTON_PATTERN;
+  window.__llAutoResume.PAGE_NEXT_PATTERN = PAGE_NEXT_PATTERN;
 })();

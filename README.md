@@ -14,6 +14,27 @@ While the switch is ON:
 
 One switch controls all four. To pause for real, turn the switch OFF.
 
+## Auto-next on text lessons
+
+A second switch, **off by default**. Text and document lessons have no video, so
+they never fire `ended` and the four behaviours above never apply — they just sit
+there until you click **Next**.
+
+With this on, the extension clicks Next as soon as it finds it. That means it
+**skips past content you have not read**, which is why it is opt-in and separate
+from the main switch.
+
+The Next button is matched by its label, not its class: LinkedIn's class names
+are build hashes (`_button_ps32ck`) that change on every deploy. The pattern is
+anchored at the start of the label so the Previous button sitting next to it can
+never match.
+
+**Runaway guard.** Ten advances within a minute stops it until you toggle the
+switch off and on. The tally lives in `chrome.storage.local`, not in memory,
+because each advance reloads the page and destroys the content script — a
+counter held in memory would be wiped by the very action it counts. Without
+this, a course of consecutive text pages is walked end to end in seconds.
+
 ## When it stands down
 
 Resuming a video nobody is looking at is worse than useless, so the extension
@@ -83,7 +104,7 @@ Turn logging off with:
 | `src/content/toast.js` | The brief on-video notification. |
 | `src/content/index.js` | Wires the pieces, attaches listeners, runs the 2s watchdog. |
 | `src/background/worker.js` | Renders the toolbar badge, and reports screen lock (`chrome.idle` is not reachable from a content script). |
-| `src/popup/` | The ON/OFF switch and resume counter. |
+| `src/popup/` | The two switches and the counters. |
 
 The split exists so that the fragile part (selectors) is isolated from the part
 worth testing (logic), and so a LinkedIn redesign only requires editing
@@ -93,4 +114,6 @@ worth testing (logic), and so a LinkedIn redesign only requires editing
 
 - Chrome and Edge only (Manifest V3).
 - Does not answer chapter quizzes.
-- The resume count is per-tab and resets on reload.
+- The resume count is per-tab and resets on reload. The auto-next count does
+  not — it is a running total kept in `chrome.storage.local`.
+- Auto-next fires within one watchdog tick, so "immediately" means up to 2s.

@@ -7,6 +7,7 @@
 
   const WATCHDOG_MS = 2000;
   const DEBUG_KEY = 'llAutoResumeDebug';
+  const ADVANCE_LOG_KEY = 'autoNextLog';
 
   // Set localStorage.llAutoResumeDebug = '1' on the page to see what the
   // selectors are matching. Off by default so the console stays clean.
@@ -39,6 +40,15 @@
     player,
     log,
     canIntervene: () => gate.isOpen(),
+    // chrome.storage.local, not memory: an advance destroys this page and its
+    // content script, so an in-memory tally could never bound a runaway.
+    loadAdvanceLog: async () => {
+      const stored = await chrome.storage.local.get({ [ADVANCE_LOG_KEY]: null });
+      const value = stored[ADVANCE_LOG_KEY];
+      if (!value || !Array.isArray(value.log)) return { log: [], total: 0 };
+      return { log: value.log, total: typeof value.total === 'number' ? value.total : 0 };
+    },
+    saveAdvanceLog: (value) => chrome.storage.local.set({ [ADVANCE_LOG_KEY]: value }),
     getStoredRate: () => cachedRate,
     saveRate: (rate) => {
       cachedRate = rate;
@@ -54,6 +64,14 @@
     },
     onCooldown: () => {
       toast.show('Tạm ngưng 60 giây — LinkedIn đang dừng liên tục', 'warn');
+      pushState();
+    },
+    onAutoNext: () => {
+      toast.show('Tự chuyển sang bài tiếp theo');
+      pushState();
+    },
+    onAutoNextStopped: () => {
+      toast.show('Tự qua trang bị dừng — chuyển quá nhanh', 'warn');
       pushState();
     },
   });
@@ -101,18 +119,23 @@
     gate.noteTick();
     attach(player.getVideo());
     resumer.checkModal().catch((error) => log('checkModal threw:', error && error.message));
+    resumer
+      .checkTextLesson()
+      .catch((error) => log('checkTextLesson threw:', error && error.message));
     // A pause that fired before the listener was attached still needs handling.
     if (attachedVideo && attachedVideo.paused && !attachedVideo.ended) {
       handlePause();
     }
   }
 
-  chrome.storage.sync.get({ enabled: true, rate: 1 }).then((stored) => {
+  chrome.storage.sync.get({ enabled: true, rate: 1, autoNextText: false }).then((stored) => {
     resumer.setEnabled(stored.enabled !== false);
+    resumer.setAutoNextText(stored.autoNextText === true);
     cachedRate = typeof stored.rate === 'number' && stored.rate > 0 ? stored.rate : 1;
-    log('initialised; enabled =', stored.enabled, 'rate =', cachedRate);
+    log('initialised; enabled =', stored.enabled, 'autoNextText =', stored.autoNextText,
+      'rate =', cachedRate);
+    resumer.syncAutoNextCount().catch(() => {}).then(pushState);
     tick();
-    pushState();
   });
 
   document.addEventListener('visibilitychange', () => {
@@ -141,6 +164,16 @@
       return true;
     }
 
+    if (message.type === 'll-autoresume:set-auto-next') {
+      const on = Boolean(message.autoNextText);
+      resumer.setAutoNextText(on, { reset: true });
+      chrome.storage.sync.set({ autoNextText: on }).catch(() => {});
+      toast.show(on ? 'Tự qua trang text: BẬT' : 'Tự qua trang text: TẮT');
+      pushState();
+      sendResponse({ ok: true });
+      return true;
+    }
+
     if (message.type === 'll-autoresume:lock-state') {
       gate.setLocked(Boolean(message.locked));
       sendResponse({ ok: true });
@@ -153,6 +186,9 @@
         enabled: state.enabled,
         resumeCount: state.resumeCount,
         blocked: state.blocked,
+        autoNextText: state.autoNextText,
+        autoNextCount: state.autoNextCount,
+        autoNextStopped: state.autoNextStopped,
       });
       return true;
     }

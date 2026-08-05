@@ -20,9 +20,24 @@ h1 {
   cursor: pointer;
 }
 
+.row + .row {
+  margin-top: 8px;
+}
+
+.hint {
+  margin: 4px 0 0 24px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #767676;
+}
+
 .stat {
   margin: 12px 0 0;
   color: #555;
+}
+
+.stat + .stat {
+  margin-top: 4px;
 }
 
 .note {

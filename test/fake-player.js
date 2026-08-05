@@ -10,6 +10,28 @@ export function createFakePlayer(overrides = {}) {
     dismissCalls: 0,
     modal: null,
 
+    // Text-lesson state: no video, a Next button, and an SPA location.
+    video: true,
+    location: 'https://www.linkedin.com/learning/course/lesson-1',
+    pageNextButton: false,
+    pageNextClicks: 0,
+    pageNextNavigates: true,
+
+    hasVideo: () => player.video,
+    getLocation: () => player.location,
+    findPageNextButton() {
+      if (!player.pageNextButton) return null;
+      return {
+        click: () => {
+          player.pageNextClicks += 1;
+          if (player.pageNextNavigates) {
+            player.location = `${player.location}-next${player.pageNextClicks}`;
+          }
+          return true;
+        },
+      };
+    },
+
     isPaused: () => player.paused,
     isEnded: () => player.ended,
     async play() {
