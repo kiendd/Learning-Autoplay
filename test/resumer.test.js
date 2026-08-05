@@ -257,3 +257,74 @@ test('checkModal does nothing when disabled', async () => {
 
   assert.equal(player.dismissCalls, 0);
 });
+
+function setupWithRate(initialStoredRate = 1) {
+  const player = createFakePlayer();
+  const clock = createFakeClock();
+  const saved = [];
+  let stored = initialStoredRate;
+  const resumer = createResumer({
+    player,
+    now: clock.now,
+    sleep: noSleep,
+    log: () => {},
+    getStoredRate: () => stored,
+    saveRate: (rate) => {
+      stored = rate;
+      saved.push(rate);
+    },
+  });
+  return { player, clock, resumer, saved, getStored: () => stored };
+}
+
+test('records the rate when it changes during playback', () => {
+  const { player, resumer, getStored } = setupWithRate(1);
+  player.paused = false;
+  player.rate = 1.5;
+
+  resumer.onRateChange();
+
+  assert.equal(getStored(), 1.5);
+});
+
+test('ignores rate changes while the video is paused', () => {
+  const { player, resumer, getStored } = setupWithRate(1);
+  player.paused = true;
+  player.rate = 2;
+
+  resumer.onRateChange();
+
+  assert.equal(getStored(), 1);
+});
+
+test('restores the stored rate when the current rate differs', () => {
+  const { player, resumer } = setupWithRate(1.5);
+  player.rate = 1;
+
+  resumer.restoreRate();
+
+  assert.equal(player.rate, 1.5);
+});
+
+test('does not touch the rate when it already matches', () => {
+  const { player, resumer } = setupWithRate(1.5);
+  player.rate = 1.5;
+  let setCalls = 0;
+  player.setRate = () => {
+    setCalls += 1;
+  };
+
+  resumer.restoreRate();
+
+  assert.equal(setCalls, 0);
+});
+
+test('restores the rate after a successful resume', async () => {
+  const { player, resumer } = setupWithRate(1.5);
+  player.paused = true;
+  player.rate = 1;
+
+  await resumer.onPause();
+
+  assert.equal(player.rate, 1.5);
+});

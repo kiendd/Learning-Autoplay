@@ -10,13 +10,16 @@ const DEFAULTS = {
   onResumed: () => {},
   onBlocked: () => {},
   onCooldown: () => {},
+  getStoredRate: () => 1,
+  saveRate: () => {},
 };
 
 function createResumer(options) {
-  const { player, now, sleep, log, onResumed, onBlocked, onCooldown } = {
-    ...DEFAULTS,
-    ...options,
-  };
+  const {
+    player, now, sleep, log,
+    onResumed, onBlocked, onCooldown,
+    getStoredRate, saveRate,
+  } = { ...DEFAULTS, ...options };
 
   let enabled = true;
   let resumeCount = 0;
@@ -87,6 +90,7 @@ function createResumer(options) {
     blocked = false;
     resumeCount += 1;
     recentResumes.push(now());
+    restoreRate();
     onResumed();
   }
 
@@ -102,13 +106,27 @@ function createResumer(options) {
     dismissModal();
   }
 
-  function onRateChange() {}
+  function onRateChange() {
+    if (player.isPaused()) return;
+    const rate = player.getRate();
+    log('remembering playback rate', rate);
+    saveRate(rate);
+  }
+
+  function restoreRate() {
+    const wanted = getStoredRate();
+    if (typeof wanted !== 'number' || wanted <= 0) return;
+    if (player.getRate() === wanted) return;
+    log('restoring playback rate to', wanted);
+    player.setRate(wanted);
+  }
 
   return {
     onPause,
     onEnded,
     onRateChange,
     checkModal,
+    restoreRate,
     setEnabled(value) {
       enabled = value;
     },
