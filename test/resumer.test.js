@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createResumer } from './load-resumer.js';
+import { loadContentScript } from './load-content-script.js';
 import { createFakePlayer, createFakeClock, noSleep } from './fake-player.js';
+
+const { createResumer } = loadContentScript('resumer.js');
 
 function setup(overrides = {}) {
   const player = createFakePlayer(overrides.player);
@@ -327,4 +329,50 @@ test('restores the rate after a successful resume', async () => {
   await resumer.onPause();
 
   assert.equal(player.rate, 1.5);
+});
+
+test('does not resume while the gate is closed', async () => {
+  const { player, resumer, events } = setup({ resumer: { canIntervene: () => false } });
+  player.paused = true;
+
+  await resumer.onPause();
+
+  assert.equal(player.playCalls, 0);
+  assert.equal(player.clickPlayButtonCalls, 0);
+  assert.equal(player.paused, true);
+  assert.equal(events.resumed, 0);
+  assert.equal(resumer.getState().suppressed, true);
+});
+
+test('does not advance to the next lesson while the gate is closed', async () => {
+  const { player, resumer } = setup({ resumer: { canIntervene: () => false } });
+
+  await resumer.onEnded();
+
+  assert.equal(player.goNextCalls, 0);
+});
+
+test('does not dismiss a blocking modal while the gate is closed', async () => {
+  const { player, resumer } = setup({ resumer: { canIntervene: () => false } });
+  player.paused = true;
+  player.modal = {};
+
+  await resumer.checkModal();
+
+  assert.equal(player.dismissCalls, 0);
+});
+
+test('resumes once the gate reopens', async () => {
+  const open = { value: false };
+  const { player, resumer } = setup({ resumer: { canIntervene: () => open.value } });
+  player.paused = true;
+
+  await resumer.onPause();
+  assert.equal(player.playCalls, 0);
+
+  open.value = true;
+  await resumer.onPause();
+
+  assert.equal(player.playCalls, 1);
+  assert.equal(player.paused, false);
 });

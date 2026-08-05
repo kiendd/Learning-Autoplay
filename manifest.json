@@ -3,7 +3,7 @@
   "name": "LinkedIn Learning Auto-Resume",
   "version": "0.1.0",
   "description": "Automatically resumes LinkedIn Learning videos that stop on their own.",
-  "permissions": ["storage"],
+  "permissions": ["storage", "idle"],
   "host_permissions": ["https://www.linkedin.com/learning/*"],
   "background": {
     "service_worker": "src/background/worker.js",
@@ -20,6 +20,7 @@
       "run_at": "document_idle",
       "js": [
         "src/content/namespace.js",
+        "src/content/gate.js",
         "src/content/resumer.js",
         "src/content/player.js",
         "src/content/toast.js",

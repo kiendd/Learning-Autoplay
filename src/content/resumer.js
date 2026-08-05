@@ -12,13 +12,14 @@ const DEFAULTS = {
   onCooldown: () => {},
   getStoredRate: () => 1,
   saveRate: () => {},
+  canIntervene: () => true,
 };
 
 function createResumer(options) {
   const {
     player, now, sleep, log,
     onResumed, onBlocked, onCooldown,
-    getStoredRate, saveRate,
+    getStoredRate, saveRate, canIntervene,
   } = { ...DEFAULTS, ...options };
 
   let enabled = true;
@@ -71,6 +72,7 @@ function createResumer(options) {
 
   async function onPause() {
     if (!enabled) return;
+    if (!canIntervene()) return;
     if (player.isEnded()) return;
     if (!player.isPaused()) return;
     if (inCooldown()) return;
@@ -96,12 +98,16 @@ function createResumer(options) {
 
   async function onEnded() {
     if (!enabled) return;
+    // Without this the extension would walk through the whole course while the
+    // screen is locked overnight.
+    if (!canIntervene()) return;
     log('video ended, advancing to the next lesson');
     player.goNext();
   }
 
   async function checkModal() {
     if (!enabled) return;
+    if (!canIntervene()) return;
     if (!player.isPaused()) return;
     dismissModal();
   }
@@ -130,7 +136,13 @@ function createResumer(options) {
     setEnabled(value) {
       enabled = value;
     },
-    getState: () => ({ enabled, resumeCount, blocked, cooldownUntil }),
+    getState: () => ({
+      enabled,
+      resumeCount,
+      blocked,
+      cooldownUntil,
+      suppressed: !canIntervene(),
+    }),
   };
 }
 

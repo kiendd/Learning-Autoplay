@@ -1,6 +1,6 @@
 (() => {
   const ns = window.__llAutoResume;
-  if (!ns || !ns.createResumer || !ns.createDomPlayer || !ns.createToast) {
+  if (!ns || !ns.createResumer || !ns.createDomPlayer || !ns.createToast || !ns.createGate) {
     console.warn('[ll-autoresume] content scripts loaded out of order; aborting');
     return;
   }
@@ -25,11 +25,20 @@
   const player = ns.createDomPlayer({ log });
   const toast = ns.createToast({ log });
 
+  // visibilityState is 'visible' whenever this is the selected tab in a window
+  // that is not minimised or fully covered — and it stays 'visible' when the
+  // window merely loses focus, which is exactly the case we want to keep serving.
+  const gate = ns.createGate({
+    log,
+    isVisible: () => document.visibilityState === 'visible',
+  });
+
   let cachedRate = 1;
 
   const resumer = ns.createResumer({
     player,
     log,
+    canIntervene: () => gate.isOpen(),
     getStoredRate: () => cachedRate,
     saveRate: (rate) => {
       cachedRate = rate;
@@ -89,6 +98,7 @@
   }
 
   function tick() {
+    gate.noteTick();
     attach(player.getVideo());
     resumer.checkModal().catch((error) => log('checkModal threw:', error && error.message));
     // A pause that fired before the listener was attached still needs handling.
@@ -105,6 +115,18 @@
     pushState();
   });
 
+  document.addEventListener('visibilitychange', () => {
+    gate.evaluate();
+    log('visibility changed;', gate.getState());
+  });
+
+  // The worker pushes lock changes, but a tab that loads while the screen is
+  // already locked has no event to wait for.
+  chrome.runtime
+    .sendMessage({ type: 'll-autoresume:query-lock' })
+    .then((reply) => gate.setLocked(Boolean(reply && reply.locked)))
+    .catch(() => {});
+
   setInterval(tick, WATCHDOG_MS);
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -115,6 +137,12 @@
       chrome.storage.sync.set({ enabled: Boolean(message.enabled) }).catch(() => {});
       toast.show(message.enabled ? 'Tự phát lại: BẬT' : 'Tự phát lại: TẮT');
       pushState();
+      sendResponse({ ok: true });
+      return true;
+    }
+
+    if (message.type === 'll-autoresume:lock-state') {
+      gate.setLocked(Boolean(message.locked));
       sendResponse({ ok: true });
       return true;
     }

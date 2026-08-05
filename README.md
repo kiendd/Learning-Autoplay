@@ -14,6 +14,27 @@ While the switch is ON:
 
 One switch controls all four. To pause for real, turn the switch OFF.
 
+## When it stands down
+
+Resuming a video nobody is looking at is worse than useless, so the extension
+keeps quiet unless the lesson is actually on screen:
+
+| Situation | Behaviour |
+|---|---|
+| Window not focused, tab still the visible one | **Resumes** — this is the case it exists for |
+| Another tab is in front | Stands down |
+| Window minimised or fully covered by another app | Stands down |
+| Screen locked or on a screensaver | Stands down |
+| First 5s after unlocking, waking from sleep, or returning to the tab | Waits, then resumes |
+
+The `idle` permission exists only for the locked-screen check. Being *idle* — not
+touching the keyboard for a while — is the normal state of someone watching a
+lesson and is never treated as a reason to stop.
+
+Nothing is lost while it stands down: when the lesson comes back on screen, the
+watchdog picks up the paused video and resumes it once the 5s settling period is
+over.
+
 ## Install
 
 1. Open `chrome://extensions` and turn on **Developer mode**.
@@ -28,7 +49,8 @@ works. `!` means Chrome blocked autoplay — click anywhere on the page once.
     npm test
 
 Unit tests cover the decision logic in `src/content/resumer.js` against a fake
-player, so no browser is needed.
+player, and the stand-down rules in `src/content/gate.js` against a fake clock,
+so no browser is needed.
 
 ## Tuning the selectors
 
@@ -56,10 +78,11 @@ Turn logging off with:
 | File | Responsibility |
 |---|---|
 | `src/content/resumer.js` | All decision logic. No DOM access — fully unit-tested. |
+| `src/content/gate.js` | Decides whether intervening is allowed at all. Also unit-tested. |
 | `src/content/player.js` | The only file with LinkedIn CSS selectors. |
 | `src/content/toast.js` | The brief on-video notification. |
 | `src/content/index.js` | Wires the pieces, attaches listeners, runs the 2s watchdog. |
-| `src/background/worker.js` | Renders the toolbar badge. |
+| `src/background/worker.js` | Renders the toolbar badge, and reports screen lock (`chrome.idle` is not reachable from a content script). |
 | `src/popup/` | The ON/OFF switch and resume counter. |
 
 The split exists so that the fragile part (selectors) is isolated from the part
