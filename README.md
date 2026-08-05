@@ -14,6 +14,42 @@ While the switch is ON:
 
 One switch controls all four. To pause for real, turn the switch OFF.
 
+## Settings
+
+Everything is saved in `chrome.storage.sync`, so it survives a page reload, a
+browser restart, and follows the Chrome profile to another machine. Nothing has
+to be set twice.
+
+| Setting | Where | Default |
+|---|---|---|
+| Main ON/OFF | popup switch | on |
+| Auto-next on text lessons | popup switch | off |
+| Default playback speed | popup dropdown | 1× |
+
+Reloading the extension at `chrome://extensions` gives the popup and the
+background worker new code, but a tab that is already open keeps the content
+script it was handed — which then ignores any message added since, silently. The
+worker reloads open lesson tabs on install and update so this cannot happen, and
+the popup treats an unanswered command as a stale page and says so.
+
+**Bật hết / Tắt hết** flips both switches at once. The button offers whichever
+state is not the current one.
+
+**Default speed** is a *floor*, not an exact target. Every new lesson is pinned
+to at least this speed, and so is every resume; a faster speed set on the page is
+left alone. A speed picked in the dropdown is applied exactly, even downwards.
+
+Changing the speed with LinkedIn's own control also updates the saved default —
+the two controls edit one value. A speed set on the page that is not in the
+dropdown is added to it rather than snapping to 1×.
+
+The one exception is the first four seconds after a lesson loads. A player sets
+its own speed as it starts up, and that arrives as an event indistinguishable
+from a deliberate choice — learning it is how LinkedIn's reset to 1× would
+silently become the saved default. During that window the stored speed is
+reasserted instead of overwritten, so a speed you pick in the first few seconds
+of a lesson will not stick. Pick it a moment later, or use the popup.
+
 ## Auto-next on text lessons
 
 A second switch, **off by default**. Text and document lessons have no video, so

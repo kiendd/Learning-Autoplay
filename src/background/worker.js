@@ -9,6 +9,22 @@ const LEARNING_URL = 'https://www.linkedin.com/learning/*';
 
 chrome.idle.setDetectionInterval(IDLE_DETECTION_SECONDS);
 
+// Reloading the extension swaps this worker and the popup for new code, but a
+// tab that is already open keeps running the content script it was given —
+// which then silently ignores any message type added since. Reload those tabs
+// so every piece is the same version.
+chrome.runtime.onInstalled.addListener(async () => {
+  let tabs = [];
+  try {
+    tabs = await chrome.tabs.query({ url: LEARNING_URL });
+  } catch (error) {
+    return;
+  }
+  for (const tab of tabs) {
+    if (typeof tab.id === 'number') chrome.tabs.reload(tab.id).catch(() => {});
+  }
+});
+
 // Only 'locked' matters. 'idle' merely means nobody has touched the keyboard for
 // a while, which is the normal state of someone watching a lesson — treating it
 // as a reason to stand down would defeat the whole extension.

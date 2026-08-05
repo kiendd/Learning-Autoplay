@@ -3,6 +3,13 @@ const BREAKER_LIMIT = 5;
 const BREAKER_WINDOW_MS = 10000;
 const COOLDOWN_MS = 60000;
 
+// A fresh player sets its own playback rate while it starts up, and that rate
+// arrives as a `ratechange` indistinguishable from the user picking one. For
+// this long after a video element appears, such a change is treated as the
+// player initialising: the stored rate is reasserted instead of overwritten.
+// Without it, LinkedIn's reset to 1× quietly becomes the saved default.
+const RATE_SETTLE_MS = 4000;
+
 // Auto-next on text lessons clicks the moment it sees the button, so a course
 // made of consecutive text pages would be walked end to end in seconds. These
 // bound a runaway.
@@ -40,6 +47,7 @@ function createResumer(options) {
   let cooldownUntil = 0;
   let recentResumes = [];
 
+  let rateSettleUntil = 0;
   let autoNextText = false;
   let autoNextStopped = false;
   let advancedFrom = null;
@@ -179,17 +187,37 @@ function createResumer(options) {
 
   function onRateChange() {
     if (player.isPaused()) return;
+    if (now() < rateSettleUntil) {
+      log('ignoring a rate change while the player settles');
+      restoreRate();
+      return;
+    }
     const rate = player.getRate();
     log('remembering playback rate', rate);
     saveRate(rate);
   }
 
+  // A floor rather than an exact match: the stored rate is the slowest the
+  // lesson should ever run at, so a faster one set on the page is left alone.
   function restoreRate() {
     const wanted = getStoredRate();
     if (typeof wanted !== 'number' || wanted <= 0) return;
-    if (player.getRate() === wanted) return;
-    log('restoring playback rate to', wanted);
+    if (player.getRate() >= wanted) return;
+    log('raising playback rate to', wanted);
     player.setRate(wanted);
+  }
+
+  // Called when a new video element appears — a page load or a lesson change.
+  function onVideoChanged() {
+    rateSettleUntil = now() + RATE_SETTLE_MS;
+    restoreRate();
+  }
+
+  // The watchdog keeps reasserting the rate for as long as the player might
+  // still be overriding it.
+  function keepRate() {
+    if (now() >= rateSettleUntil) return;
+    restoreRate();
   }
 
   return {
@@ -199,6 +227,8 @@ function createResumer(options) {
     checkModal,
     checkTextLesson,
     restoreRate,
+    onVideoChanged,
+    keepRate,
     setEnabled(value) {
       enabled = value;
     },
@@ -241,6 +271,7 @@ if (typeof window !== 'undefined') {
   window.__llAutoResume.BREAKER_LIMIT = BREAKER_LIMIT;
   window.__llAutoResume.BREAKER_WINDOW_MS = BREAKER_WINDOW_MS;
   window.__llAutoResume.COOLDOWN_MS = COOLDOWN_MS;
+  window.__llAutoResume.RATE_SETTLE_MS = RATE_SETTLE_MS;
   window.__llAutoResume.AUTO_NEXT_LIMIT = AUTO_NEXT_LIMIT;
   window.__llAutoResume.AUTO_NEXT_WINDOW_MS = AUTO_NEXT_WINDOW_MS;
 }
@@ -251,6 +282,7 @@ if (typeof module !== 'undefined' && module.exports) {
     BREAKER_LIMIT,
     BREAKER_WINDOW_MS,
     COOLDOWN_MS,
+    RATE_SETTLE_MS,
     AUTO_NEXT_LIMIT,
     AUTO_NEXT_WINDOW_MS,
   };

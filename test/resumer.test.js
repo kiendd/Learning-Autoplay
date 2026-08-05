@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { loadContentScript } from './load-content-script.js';
 import { createFakePlayer, createFakeClock, noSleep } from './fake-player.js';
 
-const { createResumer } = loadContentScript('resumer.js');
+const { createResumer, RATE_SETTLE_MS } = loadContentScript('resumer.js');
 
 function setup(overrides = {}) {
   const player = createFakePlayer(overrides.player);
@@ -375,4 +375,62 @@ test('resumes once the gate reopens', async () => {
 
   assert.equal(player.playCalls, 1);
   assert.equal(player.paused, false);
+});
+
+test('leaves a rate faster than the stored one alone', () => {
+  const { player, resumer } = setupWithRate(1.5);
+  player.rate = 2;
+
+  resumer.restoreRate();
+
+  assert.equal(player.rate, 2, 'the stored rate is a floor, not an exact target');
+});
+
+test('a new video is pinned to at least the stored rate', () => {
+  const { player, resumer } = setupWithRate(1.75);
+  player.rate = 1;
+
+  resumer.onVideoChanged();
+
+  assert.equal(player.rate, 1.75);
+});
+
+// LinkedIn resetting to 1× as its player starts up must not become the default.
+test('does not learn a rate change while the player is still settling', () => {
+  const { player, clock, resumer, getStored } = setupWithRate(1.75);
+  resumer.onVideoChanged();
+  player.paused = false;
+
+  clock.advance(RATE_SETTLE_MS - 1);
+  player.rate = 1;
+  resumer.onRateChange();
+
+  assert.equal(getStored(), 1.75, 'the stored default must survive');
+  assert.equal(player.rate, 1.75, 'and be reasserted on the video');
+});
+
+test('learns a rate change once the player has settled', () => {
+  const { player, clock, resumer, getStored } = setupWithRate(1.75);
+  resumer.onVideoChanged();
+  player.paused = false;
+
+  clock.advance(RATE_SETTLE_MS);
+  player.rate = 1.25;
+  resumer.onRateChange();
+
+  assert.equal(getStored(), 1.25, 'a deliberate change is still remembered');
+});
+
+test('the watchdog reasserts the rate only while the player is settling', () => {
+  const { player, clock, resumer } = setupWithRate(1.5);
+  resumer.onVideoChanged();
+
+  player.rate = 1;
+  resumer.keepRate();
+  assert.equal(player.rate, 1.5, 'reasserted during the settle window');
+
+  clock.advance(RATE_SETTLE_MS);
+  player.rate = 1;
+  resumer.keepRate();
+  assert.equal(player.rate, 1, 'left alone afterwards');
 });

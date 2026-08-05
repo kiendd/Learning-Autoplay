@@ -112,12 +112,13 @@
     video.addEventListener('pause', handlePause);
     video.addEventListener('ended', handleEnded);
     video.addEventListener('ratechange', handleRateChange);
-    resumer.restoreRate();
+    resumer.onVideoChanged();
   }
 
   function tick() {
     gate.noteTick();
     attach(player.getVideo());
+    resumer.keepRate();
     resumer.checkModal().catch((error) => log('checkModal threw:', error && error.message));
     resumer
       .checkTextLesson()
@@ -164,6 +165,23 @@
       return true;
     }
 
+    if (message.type === 'll-autoresume:set-rate') {
+      const wanted = Number(message.rate);
+      if (!(wanted > 0)) {
+        sendResponse({ ok: false });
+        return true;
+      }
+      cachedRate = wanted;
+      chrome.storage.sync.set({ rate: wanted }).catch(() => {});
+      // An explicit pick must land exactly, even when it is slower than what
+      // the video is doing now — restoreRate only ever raises.
+      player.setRate(wanted);
+      toast.show(`Tốc độ mặc định: ${String(wanted).replace('.', ',')}×`);
+      pushState();
+      sendResponse({ ok: true });
+      return true;
+    }
+
     // One message rather than two, so the popup's "Bật hết" button produces a
     // single toast instead of a pair.
     if (message.type === 'll-autoresume:set-all') {
@@ -202,6 +220,7 @@
         autoNextText: state.autoNextText,
         autoNextCount: state.autoNextCount,
         autoNextStopped: state.autoNextStopped,
+        rate: cachedRate,
       });
       return true;
     }
