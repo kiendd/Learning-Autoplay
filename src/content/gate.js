@@ -5,6 +5,11 @@
 // another app, and it must keep resuming. So window focus is deliberately not an
 // input here — only visibility, screen lock, and a short settling period.
 
+// Wrapped in an IIFE because every content script shares one lexical scope in
+// the isolated world: a bare top-level `const` here would collide with the same
+// name in a sibling file and kill that file at parse time.
+(() => {
+
 const GRACE_MS = 5000;
 const WAKE_GAP_MS = 30000;
 
@@ -92,3 +97,5 @@ if (typeof window !== 'undefined') {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { createGate, GRACE_MS, WAKE_GAP_MS };
 }
+
+})();
