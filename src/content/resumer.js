@@ -58,12 +58,22 @@ function createResumer(options) {
     return player.clickPlayButton() === true;
   }
 
+  // Dismisses a dialog overlaying the paused player. Returns true if one was closed.
+  function dismissModal() {
+    const modal = player.findBlockingModal();
+    if (!modal) return false;
+    log('dismissing a blocking modal');
+    return modal.dismiss() === true;
+  }
+
   async function onPause() {
     if (!enabled) return;
     if (player.isEnded()) return;
     if (!player.isPaused()) return;
     if (inCooldown()) return;
     if (breakerTripped()) return;
+
+    dismissModal();
 
     const succeeded = await attemptPlay();
     if (!succeeded) {
@@ -80,7 +90,17 @@ function createResumer(options) {
     onResumed();
   }
 
-  async function onEnded() {}
+  async function onEnded() {
+    if (!enabled) return;
+    log('video ended, advancing to the next lesson');
+    player.goNext();
+  }
+
+  async function checkModal() {
+    if (!enabled) return;
+    if (!player.isPaused()) return;
+    dismissModal();
+  }
 
   function onRateChange() {}
 
@@ -88,6 +108,7 @@ function createResumer(options) {
     onPause,
     onEnded,
     onRateChange,
+    checkModal,
     setEnabled(value) {
       enabled = value;
     },

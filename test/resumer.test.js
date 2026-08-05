@@ -195,3 +195,65 @@ test('emits the cooldown notice only once per cooldown period', async () => {
 
   assert.equal(events.cooldown, 1);
 });
+
+test('advances to the next lesson when the video ends', async () => {
+  const { player, resumer } = setup();
+  player.ended = true;
+
+  await resumer.onEnded();
+
+  assert.equal(player.goNextCalls, 1);
+  assert.equal(player.playCalls, 0);
+});
+
+test('does not advance when disabled', async () => {
+  const { player, resumer } = setup();
+  resumer.setEnabled(false);
+  player.ended = true;
+
+  await resumer.onEnded();
+
+  assert.equal(player.goNextCalls, 0);
+});
+
+test('dismisses a blocking modal while paused, then resumes', async () => {
+  const { player, resumer } = setup();
+  player.paused = true;
+  player.modal = { present: true };
+
+  await resumer.onPause();
+
+  assert.equal(player.dismissCalls, 1);
+  assert.equal(player.paused, false);
+});
+
+test('checkModal dismisses a modal while paused', async () => {
+  const { player, resumer } = setup();
+  player.paused = true;
+  player.modal = { present: true };
+
+  await resumer.checkModal();
+
+  assert.equal(player.dismissCalls, 1);
+});
+
+test('checkModal ignores modals while the video is playing', async () => {
+  const { player, resumer } = setup();
+  player.paused = false;
+  player.modal = { present: true };
+
+  await resumer.checkModal();
+
+  assert.equal(player.dismissCalls, 0);
+});
+
+test('checkModal does nothing when disabled', async () => {
+  const { player, resumer } = setup();
+  resumer.setEnabled(false);
+  player.paused = true;
+  player.modal = { present: true };
+
+  await resumer.checkModal();
+
+  assert.equal(player.dismissCalls, 0);
+});
