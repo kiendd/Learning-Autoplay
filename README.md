@@ -29,7 +29,7 @@ are build hashes (`_button_ps32ck`) that change on every deploy. The pattern is
 anchored at the start of the label so the Previous button sitting next to it can
 never match.
 
-**Runaway guard.** Ten advances within a minute stops it until you toggle the
+**Runaway guard.** Five advances within a minute stops it until you toggle the
 switch off and on. The tally lives in `chrome.storage.local`, not in memory,
 because each advance reloads the page and destroys the content script — a
 counter held in memory would be wiped by the very action it counts. Without

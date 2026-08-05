@@ -40,7 +40,7 @@ button must also be visible and not disabled.
 
 ## Runaway guard
 
-Ten advances within sixty seconds stops auto-next until the switch is toggled
+Five advances within sixty seconds stops auto-next until the switch is toggled
 off and on.
 
 **The tally cannot live in memory.** Advancing navigates, which destroys the

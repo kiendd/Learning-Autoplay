@@ -10,7 +10,7 @@ const COOLDOWN_MS = 60000;
 // The tally must outlive the page: advancing destroys the content script and
 // builds a fresh one, so a counter held in memory here is wiped by the very
 // action it is counting. It is injected and persisted instead.
-const AUTO_NEXT_LIMIT = 10;
+const AUTO_NEXT_LIMIT = 5;
 const AUTO_NEXT_WINDOW_MS = 60000;
 
 const DEFAULTS = {

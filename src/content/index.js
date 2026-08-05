@@ -164,6 +164,19 @@
       return true;
     }
 
+    // One message rather than two, so the popup's "Bật hết" button produces a
+    // single toast instead of a pair.
+    if (message.type === 'll-autoresume:set-all') {
+      const on = Boolean(message.on);
+      resumer.setEnabled(on);
+      resumer.setAutoNextText(on, { reset: true });
+      chrome.storage.sync.set({ enabled: on, autoNextText: on }).catch(() => {});
+      toast.show(on ? 'Đã bật hết' : 'Đã tắt hết');
+      pushState();
+      sendResponse({ ok: true });
+      return true;
+    }
+
     if (message.type === 'll-autoresume:set-auto-next') {
       const on = Boolean(message.autoNextText);
       resumer.setAutoNextText(on, { reset: true });
