@@ -1,5 +1,6 @@
 const toggle = document.getElementById('toggle');
-const toggleLabel = document.getElementById('toggle-label');
+const status = document.getElementById('status');
+const statusText = document.getElementById('status-text');
 const autoNext = document.getElementById('auto-next');
 const all = document.getElementById('all');
 const rate = document.getElementById('rate');
@@ -29,10 +30,17 @@ function renderAllButton() {
   all.textContent = toggle.checked && autoNext.checked ? 'Tắt hết' : 'Bật hết';
 }
 
+// The switches say what each feature does; this says whether anything is on.
+function renderStatus() {
+  const on = toggle.checked || autoNext.checked;
+  statusText.textContent = on ? 'Đang bật' : 'Đang tắt';
+  status.classList.toggle('on', on);
+}
+
 function render(state) {
   toggle.checked = Boolean(state.enabled);
-  toggleLabel.textContent = state.enabled ? 'Đang bật' : 'Đang tắt';
   autoNext.checked = Boolean(state.autoNextText);
+  renderStatus();
   count.textContent = String(state.resumeCount || 0);
   nextCount.textContent = String(state.autoNextCount || 0);
   // A speed set on the page rather than here may not be one of the listed
@@ -79,11 +87,12 @@ toggle.addEventListener('change', async () => {
   if (tabId === null) return;
   try {
     await command(tabId, { type: 'll-autoresume:set-enabled', enabled: toggle.checked });
-    toggleLabel.textContent = toggle.checked ? 'Đang bật' : 'Đang tắt';
+    renderStatus();
     renderAllButton();
     note.textContent = '';
   } catch (error) {
     toggle.checked = !toggle.checked;
+    renderStatus();
     note.textContent = error.message === 'stale' ? STALE : 'Hãy mở một bài học LinkedIn Learning.';
   }
 });
@@ -93,10 +102,12 @@ autoNext.addEventListener('change', async () => {
   if (tabId === null) return;
   try {
     await command(tabId, { type: 'll-autoresume:set-auto-next', autoNextText: autoNext.checked });
+    renderStatus();
     renderAllButton();
     note.textContent = '';
   } catch (error) {
     autoNext.checked = !autoNext.checked;
+    renderStatus();
     note.textContent = error.message === 'stale' ? STALE : 'Hãy mở một bài học LinkedIn Learning.';
   }
 });

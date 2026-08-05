@@ -5,14 +5,16 @@ moment does not mean losing the lesson.
 
 ## What it does
 
-While the switch is ON:
+**Tự động chạy lại video** — the first switch, on by default — covers four
+behaviours together:
 
 - Resumes playback whenever the video pauses.
 - Clicks through dialogs that block the player ("still watching?").
 - Advances to the next lesson when a video ends.
-- Restores your playback speed if it gets reset.
+- Keeps playback at your default speed.
 
-One switch controls all four. To pause for real, turn the switch OFF.
+There is no separate control for each; to pause for real, turn the switch off.
+The popup header shows **Đang bật** or **Đang tắt** at a glance.
 
 ## Settings
 
@@ -22,15 +24,27 @@ to be set twice.
 
 | Setting | Where | Default |
 |---|---|---|
-| Main ON/OFF | popup switch | on |
-| Auto-next on text lessons | popup switch | off |
-| Default playback speed | popup dropdown | 1× |
+| Tự động chạy lại video | popup switch | on |
+| Tự qua trang text | popup switch | off |
+| Tốc độ mặc định | popup dropdown | 1× |
 
 Reloading the extension at `chrome://extensions` gives the popup and the
 background worker new code, but a tab that is already open keeps the content
-script it was handed — which then ignores any message added since, silently. The
-worker reloads open lesson tabs on install and update so this cannot happen, and
-the popup treats an unanswered command as a stale page and says so.
+script it was handed — which then ignores any message added since, silently.
+
+`onInstalled` does not cover this: it never fires for a plain restart. So the
+worker asks instead. The content script reports a `CONTRACT` number in its state,
+and any tab answering with a different one is running older code and gets
+reloaded. A tab that does not answer at all is left alone — that has other
+causes, and reloading on silence could loop. Each tab is reloaded at most once
+in five minutes, so a mismatch that a reload cannot fix costs one reload rather
+than an endless cycle.
+
+**When the message protocol changes, bump `CONTRACT` in both
+`src/content/index.js` and `src/background/worker.js`.**
+
+The popup also treats an unanswered command as a stale page: it reverts the
+control and says to reload.
 
 **Bật hết / Tắt hết** flips both switches at once. The button offers whichever
 state is not the current one.
@@ -140,7 +154,7 @@ Turn logging off with:
 | `src/content/toast.js` | The brief on-video notification. |
 | `src/content/index.js` | Wires the pieces, attaches listeners, runs the 2s watchdog. |
 | `src/background/worker.js` | Renders the toolbar badge, and reports screen lock (`chrome.idle` is not reachable from a content script). |
-| `src/popup/` | The two switches and the counters. |
+| `src/popup/` | Status line, two switches, the speed dropdown, the counters. |
 
 The split exists so that the fragile part (selectors) is isolated from the part
 worth testing (logic), and so a LinkedIn redesign only requires editing

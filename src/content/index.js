@@ -5,6 +5,11 @@
     return;
   }
 
+  // Bumped whenever the message protocol changes. The worker compares this
+  // against its own copy to spot a tab still running an older content script;
+  // keep the two in step. See CONTRACT in src/background/worker.js.
+  const CONTRACT = 2;
+
   const WATCHDOG_MS = 2000;
   const DEBUG_KEY = 'llAutoResumeDebug';
   const ADVANCE_LOG_KEY = 'autoNextLog';
@@ -221,6 +226,7 @@
         autoNextCount: state.autoNextCount,
         autoNextStopped: state.autoNextStopped,
         rate: cachedRate,
+        contract: CONTRACT,
       });
       return true;
     }
