@@ -1,178 +1,203 @@
 # LinkedIn Learning Auto-Resume
 
-Resumes LinkedIn Learning videos that stop on their own, so losing focus for a
-moment does not mean losing the lesson.
+**[Tiếng Việt](#tiếng-việt) · [English](#english)**
 
-## What it does
+LinkedIn Learning dừng video khi tưởng bạn không còn ở đó. Extension này bật lại.
 
-**Tự động chạy lại video** — the first switch, on by default — covers four
-behaviours together:
+*LinkedIn Learning stops the video when it thinks you have left. This puts it
+back on.*
 
-- Resumes playback whenever the video pauses.
-- Clicks through dialogs that block the player ("still watching?").
-- Advances to the next lesson when a video ends.
-- Keeps playback at your default speed.
+<img src="images/Popup.png" width="260" alt="Bảng điều khiển" />
 
-There is no separate control for each; to pause for real, turn the switch off.
-The popup header shows **Đang bật** or **Đang tắt** at a glance.
+---
 
-## Settings
+# Tiếng Việt
 
-Everything is saved in `chrome.storage.sync`, so it survives a page reload, a
-browser restart, and follows the Chrome profile to another machine. Nothing has
-to be set twice.
+## Vấn đề
 
-| Setting | Where | Default |
-|---|---|---|
-| Tự động chạy lại video | popup switch | on |
-| Tự qua trang text | popup switch | off |
-| Tốc độ mặc định | popup dropdown | 1× |
+Bạn đang nghe một bài giảng trong lúc làm việc khác. LinkedIn không thấy bạn gõ
+phím nên cho rằng bạn đã bỏ đi, và dừng video. Vài phút sau bạn nhận ra xung
+quanh im lặng từ lúc nào, phải quay lại tìm chỗ đang nghe dở.
 
-Reloading the extension at `chrome://extensions` gives the popup and the
-background worker new code, but a tab that is already open keeps the content
-script it was handed — which then ignores any message added since, silently.
+## Cách giải quyết
 
-`onInstalled` does not cover this: it never fires for a plain restart. So the
-worker asks instead. The content script reports a `CONTRACT` number in its state,
-and any tab answering with a different one is running older code and gets
-reloaded. A tab that does not answer at all is left alone — that has other
-causes, and reloading on silence could loop. Each tab is reloaded at most once
-in five minutes, so a mismatch that a reload cannot fix costs one reload rather
-than an endless cycle.
+Extension trông chừng video. Khi nó dừng, extension bật lại — kèm một dòng chữ
+nhỏ hiện lên báo cho bạn biết.
 
-**When the message protocol changes, bump `CONTRACT` in both
-`src/content/index.js` and `src/background/worker.js`.**
+Nó cũng bấm hộ những hộp thoại kiểu "Bạn còn xem không?", chuyển sang bài tiếp
+theo khi video hết, và giữ nguyên tốc độ phát bạn thích.
 
-The popup also treats an unanswered command as a stale page: it reverts the
-control and says to reload.
+**Nó không làm phiền khi bạn không nhìn màn hình.** Khoá máy, chuyển sang tab
+khác, thu nhỏ cửa sổ — extension nằm im. Chỉ khi bài học còn hiện trên màn hình
+nó mới can thiệp. Trường hợp nó sinh ra để phục vụ là: bạn đang làm việc ở ứng
+dụng khác, cửa sổ Chrome mất focus, nhưng tab bài học vẫn đang hiện.
 
-**Bật hết / Tắt hết** flips both switches at once. The button offers whichever
-state is not the current one.
+## Cài đặt
 
-**Default speed** is a *floor*, not an exact target. Every new lesson is pinned
-to at least this speed, and so is every resume; a faster speed set on the page is
-left alone. A speed picked in the dropdown is applied exactly, even downwards.
+Xem **[Hướng dẫn cài đặt](INSTALL.md)** — khoảng 2 phút, không cần biết lập
+trình.
 
-Changing the speed with LinkedIn's own control also updates the saved default —
-the two controls edit one value. A speed set on the page that is not in the
-dropdown is added to it rather than snapping to 1×.
+## Bảng điều khiển
 
-The one exception is the first four seconds after a lesson loads. A player sets
-its own speed as it starts up, and that arrives as an event indistinguishable
-from a deliberate choice — learning it is how LinkedIn's reset to 1× would
-silently become the saved default. During that window the stored speed is
-reasserted instead of overwritten, so a speed you pick in the first few seconds
-of a lesson will not stick. Pick it a moment later, or use the popup.
+Bấm vào biểu tượng extension khi đang mở một bài học.
 
-## Auto-next on text lessons
-
-A second switch, **off by default**. Text and document lessons have no video, so
-they never fire `ended` and the four behaviours above never apply — they just sit
-there until you click **Next**.
-
-With this on, the extension clicks Next as soon as it finds it. That means it
-**skips past content you have not read**, which is why it is opt-in and separate
-from the main switch.
-
-The Next button is matched by its label, not its class: LinkedIn's class names
-are build hashes (`_button_ps32ck`) that change on every deploy. The pattern is
-anchored at the start of the label so the Previous button sitting next to it can
-never match.
-
-**Runaway guard.** Five advances within a minute stops it until you toggle the
-switch off and on. The tally lives in `chrome.storage.local`, not in memory,
-because each advance reloads the page and destroys the content script — a
-counter held in memory would be wiped by the very action it counts. Without
-this, a course of consecutive text pages is walked end to end in seconds.
-
-## When it stands down
-
-Resuming a video nobody is looking at is worse than useless, so the extension
-keeps quiet unless the lesson is actually on screen:
-
-| Situation | Behaviour |
+| | |
 |---|---|
-| Window not focused, tab still the visible one | **Resumes** — this is the case it exists for |
-| Another tab is in front | Stands down |
-| Window minimised or fully covered by another app | Stands down |
-| Screen locked or on a screensaver | Stands down |
-| First 5s after unlocking, waking from sleep, or returning to the tab | Waits, then resumes |
+| **Đang bật / Đang tắt** | Trạng thái hiện tại, chấm xanh là đang chạy. |
+| **Tự động chạy lại video** | Công tắc chính. Bật sẵn. Bao gồm cả việc bấm hộ hộp thoại, chuyển bài khi hết video, và giữ tốc độ. |
+| **Tự qua trang text** | *Tắt sẵn.* Xem mục dưới. |
+| **Tốc độ mặc định** | Tốc độ tối thiểu cho mọi bài. |
+| **Bật hết / Tắt hết** | Bật hoặc tắt cả hai công tắc bằng một nút. |
 
-The `idle` permission exists only for the locked-screen check. Being *idle* — not
-touching the keyboard for a while — is the normal state of someone watching a
-lesson and is never treated as a reason to stop.
+Mọi thiết lập được lưu lại. Bạn chỉnh một lần, không phải chỉnh lại — kể cả sau
+khi tắt máy, và nó theo tài khoản Chrome sang máy khác.
 
-Nothing is lost while it stands down: when the lesson comes back on screen, the
-watchdog picks up the paused video and resumes it once the 5s settling period is
-over.
+### Muốn dừng video thật sự?
+
+Tắt công tắc **Tự động chạy lại video**. Nếu không, extension sẽ bật lại mọi lần
+dừng — nó không đoán được lần này bạn cố ý hay LinkedIn tự dừng.
+
+### Tốc độ mặc định
+
+Đây là **mức sàn**, không phải mức cố định. Mỗi bài mới sẽ chạy ít nhất ở tốc độ
+này. Nếu bạn tăng nhanh hơn trên trang, extension để nguyên.
+
+Đổi tốc độ bằng nút của LinkedIn cũng cập nhật luôn mặc định — hai chỗ chỉnh
+cùng một giá trị. Chỉ có một ngoại lệ: trong **4 giây đầu** của một bài, thay
+đổi sẽ không được ghi nhớ. Đó là lúc trình phát đang khởi động và tự đặt tốc độ
+của nó; nếu ghi nhớ giai đoạn này thì lựa chọn của bạn sẽ bị nuốt mất. Chờ vài
+giây rồi đổi, hoặc dùng bảng điều khiển.
+
+### Tự qua trang text — cân nhắc trước khi bật
+
+Một số bài không phải video mà là trang chữ hoặc tài liệu, phải bấm **Next** mới
+đi tiếp. Bật công tắc này thì extension bấm hộ, ngay lập tức.
+
+**Nghĩa là nó bỏ qua nội dung bạn chưa đọc.** Vì vậy nó tắt sẵn và tách riêng
+khỏi công tắc chính.
+
+Có chốt an toàn: quá 5 lần chuyển trang trong một phút thì nó tự dừng. Muốn chạy
+tiếp thì tắt rồi bật lại công tắc.
+
+## Câu hỏi thường gặp
+
+**Extension có đọc được gì của tôi không?**
+Nó chỉ chạy trên `linkedin.com/learning`. Không gửi dữ liệu đi đâu cả. Thiết lập
+lưu trong bộ nhớ Chrome của bạn.
+
+**Sao lại cần quyền "biết khi nào bạn rời máy tính"?**
+Để biết máy đã khoá màn hình chưa. Khoá rồi thì extension ngừng can thiệp, không
+phát tiếng vào phòng trống. Nó **không** dừng chỉ vì bạn ngồi im không gõ phím —
+đó chính là tư thế của người đang nghe giảng.
+
+**Nó tự trả lời câu hỏi cuối chương chứ?**
+Không.
+
+**Có chạy trên Safari / Firefox không?**
+Không. Chrome và Edge thôi.
+
+**Đang bấm mà không thấy phản ứng gì.**
+Bấm F5 tải lại trang LinkedIn. Xem thêm mục xử lý sự cố trong
+[Hướng dẫn cài đặt](INSTALL.md).
+
+## Dành cho người phát triển
+
+Kiến trúc, cách chạy test, cách sửa selector khi LinkedIn đổi giao diện: xem
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+
+---
+
+# English
+
+## The problem
+
+You are listening to a lesson while doing something else. LinkedIn sees no
+typing, decides you have left, and stops the video. A few minutes later you
+notice the silence and have to go back and find your place.
+
+## What this does
+
+The extension watches the video. When it stops, the extension starts it again,
+with a small note on screen so you know.
+
+It also clicks through "Are you still watching?" dialogs, moves to the next
+lesson when a video ends, and keeps your preferred playback speed.
+
+**It stays out of the way when you are not looking.** Lock the screen, switch to
+another tab, minimise the window — the extension does nothing. It only acts while
+the lesson is actually on screen. The case it exists for is this one: you are
+working in another app, the Chrome window has lost focus, but the lesson tab is
+still the visible one.
 
 ## Install
 
-1. Open `chrome://extensions` and turn on **Developer mode**.
-2. Click **Load unpacked** and select this folder.
-3. Open a lesson at `https://www.linkedin.com/learning/...`.
+See the **[Installation Guide](INSTALL.md)** — about 2 minutes, no coding needed.
 
-The toolbar badge shows `on` when active and switches to a resume count as it
-works. `!` means Chrome blocked autoplay — click anywhere on the page once.
+## The panel
 
-## Tests
+Click the extension icon while a lesson is open. The panel is in Vietnamese;
+here is what each control means.
 
-    npm test
-
-Unit tests cover the decision logic in `src/content/resumer.js` against a fake
-player, and the stand-down rules in `src/content/gate.js` against a fake clock,
-so no browser is needed.
-
-## Tuning the selectors
-
-The resume path needs no LinkedIn-specific selector — it uses
-`document.querySelector('video')`. But the **Next button** and the
-**"still watching" dialog** are matched by CSS selectors that LinkedIn changes
-from time to time.
-
-**Quickest check:** paste the whole of `tools/diagnose.js` into the DevTools
-console on a real lesson. It reports which selector matched what, lists every
-visible button label so a failed match can be corrected in one go, and copies
-the result to the clipboard. It re-applies the selectors from the page rather
-than reading the extension, because content scripts run in an isolated world the
-page console cannot see. `test/diagnose.test.js` fails if its copy of the
-selectors drifts from `player.js`.
-
-**For a running commentary instead**, set this in the page console:
-
-    localStorage.llAutoResumeDebug = '1'
-
-Reload. The console then logs every attach, click, and failed lookup under
-`[ll-autoresume]`. If you see `next button not found` or
-`visible dialog with no continue-style button`, copy those lines and update the
-`SELECTORS` object at the top of `src/content/player.js`, then reload the
-extension.
-
-Turn logging off with:
-
-    localStorage.removeItem('llAutoResumeDebug')
-
-## Architecture
-
-| File | Responsibility |
+| | |
 |---|---|
-| `src/content/resumer.js` | All decision logic. No DOM access — fully unit-tested. |
-| `src/content/gate.js` | Decides whether intervening is allowed at all. Also unit-tested. |
-| `src/content/player.js` | The only file with LinkedIn CSS selectors. |
-| `src/content/toast.js` | The brief on-video notification. |
-| `src/content/index.js` | Wires the pieces, attaches listeners, runs the 2s watchdog. |
-| `src/background/worker.js` | Renders the toolbar badge, and reports screen lock (`chrome.idle` is not reachable from a content script). |
-| `src/popup/` | Status line, two switches, the speed dropdown, the counters. |
-| `tools/diagnose.js` | Pasted into the page console to report what the selectors match. |
+| **Đang bật / Đang tắt** | On / Off. A green dot means it is running. |
+| **Tự động chạy lại video** | *Restart video automatically.* The main switch, on by default. Covers the dialogs, moving to the next lesson, and holding the speed. |
+| **Tự qua trang text** | *Skip text pages automatically.* **Off by default** — see below. |
+| **Tốc độ mặc định** | *Default speed.* The slowest any lesson will play. |
+| **Bật hết / Tắt hết** | *All on / All off.* Flips both switches at once. |
 
-The split exists so that the fragile part (selectors) is isolated from the part
-worth testing (logic), and so a LinkedIn redesign only requires editing
-`player.js`.
+Every setting is saved. Set it once and it stays — across restarts, and across
+machines signed into the same Chrome account.
 
-## Limits
+### Want the video to actually stay paused?
 
-- Chrome and Edge only (Manifest V3).
-- Does not answer chapter quizzes.
-- The resume count is per-tab and resets on reload. The auto-next count does
-  not — it is a running total kept in `chrome.storage.local`.
-- Auto-next fires within one watchdog tick, so "immediately" means up to 2s.
+Turn off **Tự động chạy lại video**. Otherwise the extension restarts every
+pause; it cannot tell your deliberate pause from LinkedIn's.
+
+### Default speed
+
+This is a *floor*, not a fixed value. Every new lesson plays at least this fast.
+Set something faster on the page and the extension leaves it alone.
+
+Changing speed with LinkedIn's own control also updates the default — the two
+places edit one value. One exception: in the **first four seconds** of a lesson,
+a change is not remembered. That is when the player is starting up and setting
+its own speed, and remembering that would swallow your choice. Wait a moment, or
+use the panel.
+
+### Skip text pages — think before turning this on
+
+Some lessons are text or documents rather than video, and only move on when you
+click **Next**. With this switch on, the extension clicks it immediately.
+
+**That means skipping past content you have not read.** Hence off by default, and
+separate from the main switch.
+
+There is a safety catch: more than 5 pages in a minute and it stops itself. Flip
+the switch off and on to resume.
+
+## Questions
+
+**Can it read my data?**
+It runs only on `linkedin.com/learning`. Nothing is sent anywhere. Settings live
+in your own Chrome storage.
+
+**Why does it want to "know when you are away from your computer"?**
+To tell whether the screen is locked. Once it is, the extension stands down
+rather than playing audio to an empty room. It does **not** stop just because you
+are sitting still without typing — that is what watching a lesson looks like.
+
+**Does it answer the end-of-chapter quizzes?**
+No.
+
+**Safari or Firefox?**
+No. Chrome and Edge only.
+
+**A control does nothing when I click it.**
+Press F5 to reload the LinkedIn page. See the troubleshooting section of the
+[Installation Guide](INSTALL.md).
+
+## For developers
+
+Architecture, tests, and how to fix the selectors when LinkedIn changes its
+markup: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
