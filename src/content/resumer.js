@@ -1,3 +1,8 @@
+const RETRY_DELAYS = [250, 1000, 3000];
+const BREAKER_LIMIT = 5;
+const BREAKER_WINDOW_MS = 10000;
+const COOLDOWN_MS = 60000;
+
 const DEFAULTS = {
   now: () => Date.now(),
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
@@ -17,14 +22,61 @@ function createResumer(options) {
   let resumeCount = 0;
   let blocked = false;
   let cooldownUntil = 0;
+  let recentResumes = [];
+
+  function inCooldown() {
+    return now() < cooldownUntil;
+  }
+
+  // Returns true when the breaker just tripped, meaning this resume must not run.
+  function breakerTripped() {
+    const cutoff = now() - BREAKER_WINDOW_MS;
+    recentResumes = recentResumes.filter((stamp) => stamp > cutoff);
+    if (recentResumes.length < BREAKER_LIMIT) return false;
+
+    cooldownUntil = now() + COOLDOWN_MS;
+    recentResumes = [];
+    log('breaker tripped, cooling down for', COOLDOWN_MS, 'ms');
+    onCooldown();
+    return true;
+  }
+
+  // Tries play() with backoff, then the DOM button. Returns true on success.
+  async function attemptPlay() {
+    for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt += 1) {
+      try {
+        await player.play();
+        return true;
+      } catch (error) {
+        log('play() rejected on attempt', attempt + 1, error && error.message);
+        if (attempt < RETRY_DELAYS.length) {
+          await sleep(RETRY_DELAYS[attempt]);
+        }
+      }
+    }
+    log('falling back to the DOM play button');
+    return player.clickPlayButton() === true;
+  }
 
   async function onPause() {
     if (!enabled) return;
     if (player.isEnded()) return;
     if (!player.isPaused()) return;
+    if (inCooldown()) return;
+    if (breakerTripped()) return;
 
-    await player.play();
+    const succeeded = await attemptPlay();
+    if (!succeeded) {
+      if (!blocked) {
+        blocked = true;
+        onBlocked();
+      }
+      return;
+    }
+
+    blocked = false;
     resumeCount += 1;
+    recentResumes.push(now());
     onResumed();
   }
 
@@ -48,7 +100,11 @@ function createResumer(options) {
 if (typeof window !== 'undefined') {
   window.__llAutoResume = window.__llAutoResume || {};
   window.__llAutoResume.createResumer = createResumer;
+  window.__llAutoResume.RETRY_DELAYS = RETRY_DELAYS;
+  window.__llAutoResume.BREAKER_LIMIT = BREAKER_LIMIT;
+  window.__llAutoResume.BREAKER_WINDOW_MS = BREAKER_WINDOW_MS;
+  window.__llAutoResume.COOLDOWN_MS = COOLDOWN_MS;
 }
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { createResumer };
+  module.exports = { createResumer, RETRY_DELAYS, BREAKER_LIMIT, BREAKER_WINDOW_MS, COOLDOWN_MS };
 }
