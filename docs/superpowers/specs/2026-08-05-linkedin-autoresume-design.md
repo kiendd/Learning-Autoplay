@@ -65,15 +65,23 @@ Rejected alternatives:
 
 ```
 manifest.json
-src/shared/settings.js            chrome.storage read/write, defaults
-src/content/player.js             DOM adapter: <video>, Next button, modals
+src/content/namespace.js          shared global for the classic content scripts
 src/content/resumer.js            decision state machine — no DOM knowledge
+src/content/player.js             DOM adapter: <video>, Next button, modals
 src/content/toast.js              on-video notification
-src/content/index.js              bootstrap: wire player + resumer
-src/background/worker.js          badge, state sync
+src/content/index.js              bootstrap: wire player + resumer, watchdog
+src/background/worker.js          badge rendering
 src/popup/popup.{html,js,css}     ON/OFF switch, resume count
 test/resumer.test.js              unit tests against a fake player
+test/fake-player.js               fake player and fake clock
+test/load-resumer.js              loads the classic script for the tests
 ```
+
+MV3 content scripts cannot be ES modules, so every file under `src/content/` is a
+classic script sharing state through the global created by `namespace.js`. There is
+no `src/shared/settings.js` — storage access is two `chrome.storage.sync` calls in
+`index.js` and none in the popup, which reaches state through messages instead.
+A module wrapping that would be indirection without a payoff.
 
 `resumer.js` holds all decision logic and communicates only through a narrow
 player interface:
