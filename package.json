@@ -1,0 +1,10 @@
+{
+  "name": "linkedin-learning-autoresume",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Automatically resumes LinkedIn Learning videos that stop on their own.",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}
