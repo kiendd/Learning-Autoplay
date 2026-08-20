@@ -25,7 +25,13 @@
   // its class names are build hashes (`_button_ps32ck`) that change on every
   // LinkedIn deploy, so match the label instead. Anchored at the start so
   // "Previous" can never match.
-  const PAGE_NEXT_PATTERN = /^(next|tiếp theo|kế tiếp)\b/i;
+  //
+  // No `\b` after the group. LinkedIn concatenates a visible label with an
+  // adjacent screen-reader span and no separator, producing labels like
+  // "NextNext" (observed on the video player's own next control). A word
+  // boundary never exists in those, so `\b` would reject them. It never earned
+  // its place anyway: the `^` anchor is what excludes "Previous".
+  const PAGE_NEXT_PATTERN = /^(next|tiếp theo|kế tiếp)/i;
 
   function labelOf(element) {
     return (element.textContent || '').replace(/\s+/g, ' ').trim();
@@ -105,6 +111,27 @@
       isEnded() {
         const video = findVideo();
         return video ? video.ended : false;
+      },
+
+      // null when there is no video, so a caller can tell "no video" apart from
+      // "at the very start". Everything that reads this compares it against the
+      // previous reading, and 0 is a legitimate previous reading.
+      getCurrentTime() {
+        const video = findVideo();
+        return video ? video.currentTime : null;
+      },
+
+      // Moves the playhead a hair forward. The player treats a seek as a reason
+      // to recompute which segment it needs and fetch it, which is what breaks a
+      // buffer-gap stall — the playhead sitting outside the buffered range with
+      // the player convinced it already has the data. play() cannot do this: the
+      // video is not paused, so the call is a no-op whose promise never settles.
+      nudge(seconds) {
+        const video = findVideo();
+        if (!video) return false;
+        log('nudging the playhead by', seconds, 'from', video.currentTime);
+        video.currentTime += seconds;
+        return true;
       },
 
       async play() {

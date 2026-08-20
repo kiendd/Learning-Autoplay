@@ -28,7 +28,7 @@
     ],
   };
   const MODAL_BUTTON_PATTERN = /tiếp tục|continue|resume|still watching|keep watching/i;
-  const PAGE_NEXT_PATTERN = /^(next|tiếp theo|kế tiếp)\b/i;
+  const PAGE_NEXT_PATTERN = /^(next|tiếp theo|kế tiếp)/i;
 
   const seen = (element) => {
     const rect = element.getBoundingClientRect();

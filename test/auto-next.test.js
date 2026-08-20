@@ -231,7 +231,11 @@ test('the Next label pattern never matches the Previous button beside it', () =>
     return sandbox.window.__llAutoResume;
   })();
 
-  for (const label of ['Next', 'next', 'Next video', 'Tiếp theo', 'Kế tiếp']) {
+  // "NextNext" is a shape LinkedIn actually renders: a visible label and an
+  // adjacent screen-reader span concatenate with no separator, so `\b` after
+  // `next` never finds a word boundary. Observed on the video player's own
+  // next control; the same markup habit can produce it at the foot of a page.
+  for (const label of ['Next', 'next', 'Next video', 'Tiếp theo', 'Kế tiếp', 'NextNext']) {
     assert.ok(pattern.test(label), `expected "${label}" to match`);
   }
   for (const label of ['Previous', 'Prev', 'Back', 'Trước', 'Bài trước', 'Skip to next section']) {
