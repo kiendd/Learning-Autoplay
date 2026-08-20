@@ -8,7 +8,7 @@
   // Bumped whenever the message protocol changes. The worker compares this
   // against its own copy to spot a tab still running an older content script;
   // keep the two in step. See CONTRACT in src/background/worker.js.
-  const CONTRACT = 2;
+  const CONTRACT = 3;
 
   const WATCHDOG_MS = 2000;
   const DEBUG_KEY = 'llAutoResumeDebug';
@@ -79,6 +79,14 @@
       toast.show('Tự qua trang bị dừng — chuyển quá nhanh', 'warn');
       pushState();
     },
+    onUnstuck: () => {
+      toast.show('Video bị kẹt — đã gỡ và chạy tiếp');
+      pushState();
+    },
+    onStallGaveUp: () => {
+      toast.show('Video kẹt liên tục — hãy tải lại trang (F5)', 'warn');
+      pushState();
+    },
   });
 
   // The background worker owns the badge, so it needs the current numbers.
@@ -124,6 +132,9 @@
     gate.noteTick();
     attach(player.getVideo());
     resumer.keepRate();
+    // Before the pause check below, because a stalled video is not paused and
+    // nothing else on this tick would notice it.
+    resumer.checkStall();
     resumer.checkModal().catch((error) => log('checkModal threw:', error && error.message));
     resumer
       .checkTextLesson()
@@ -225,6 +236,8 @@
         autoNextText: state.autoNextText,
         autoNextCount: state.autoNextCount,
         autoNextStopped: state.autoNextStopped,
+        unstickCount: state.unstickCount,
+        stallStopped: state.stallStopped,
         rate: cachedRate,
         contract: CONTRACT,
       });

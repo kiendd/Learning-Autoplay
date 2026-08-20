@@ -20,6 +20,33 @@ const RATE_SETTLE_MS = 4000;
 const AUTO_NEXT_LIMIT = 5;
 const AUTO_NEXT_WINDOW_MS = 60000;
 
+// A stall is the playhead standing still while the video reports itself as
+// playing: `paused` is false, `ended` is false, and no `waiting` or `stalled`
+// event ever fires. It happens when the playhead ends up outside the buffered
+// range and the player never asks for the missing segment — it is waiting for
+// data it has not requested and never will. Nothing pause-driven can see this,
+// so it is detected by watching the clock instead of by listening for an event.
+//
+// STALL_EPSILON is below one frame at any rate the player offers, so a real
+// advance always clears it; the numbers a stalled player reports are identical
+// between readings rather than merely close.
+const STALL_EPSILON = 0.05;
+
+// Long enough that a brief rebuffer on a slow connection recovers on its own
+// first — seeking through one of those would cost more than it saves.
+const STALL_MS = 3000;
+
+// The recovery: move the playhead a hair forward. That makes the player
+// recompute which segment it needs and fetch it. Small enough that nothing
+// audible is skipped.
+const NUDGE_SECONDS = 0.15;
+
+// If nudging has not restored playback this many times in a window, the cause
+// is something a seek cannot fix — a dead network, a revoked stream — and
+// repeating it would seek through the lesson a fifth of a second at a time.
+const STALL_LIMIT = 5;
+const STALL_WINDOW_MS = 60000;
+
 const DEFAULTS = {
   now: () => Date.now(),
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
@@ -29,6 +56,8 @@ const DEFAULTS = {
   onCooldown: () => {},
   onAutoNext: () => {},
   onAutoNextStopped: () => {},
+  onUnstuck: () => {},
+  onStallGaveUp: () => {},
   getStoredRate: () => 1,
   saveRate: () => {},
   canIntervene: () => true,
@@ -38,6 +67,7 @@ function createResumer(options) {
   const {
     player, now, sleep, log,
     onResumed, onBlocked, onCooldown, onAutoNext, onAutoNextStopped,
+    onUnstuck, onStallGaveUp,
     getStoredRate, saveRate, canIntervene,
   } = { ...DEFAULTS, ...options };
 
@@ -46,6 +76,15 @@ function createResumer(options) {
   let blocked = false;
   let cooldownUntil = 0;
   let recentResumes = [];
+
+  // Stall tracking. lastTime is the previous reading of the playhead and
+  // lastProgressAt when it last differed; a stall is the gap between them
+  // growing past STALL_MS.
+  let lastTime = null;
+  let lastProgressAt = 0;
+  let unstickCount = 0;
+  let recentNudges = [];
+  let stallStopped = false;
 
   let rateSettleUntil = 0;
   let autoNextText = false;
@@ -129,6 +168,57 @@ function createResumer(options) {
     onResumed();
   }
 
+  function resetStall() {
+    lastTime = null;
+    lastProgressAt = now();
+  }
+
+  // Called by the watchdog on every tick. Compares the playhead against the
+  // previous tick and nudges it when it has not moved while the video claims to
+  // be playing.
+  function checkStall() {
+    if (!enabled) return;
+    if (!canIntervene()) return;
+    if (stallStopped) return;
+    if (inCooldown()) return;
+
+    const current = player.getCurrentTime();
+    // No video, or a paused or finished one: nothing is expected to move, so
+    // start the clock fresh rather than accumulating a false stall.
+    if (current === null || player.isPaused() || player.isEnded()) {
+      resetStall();
+      return;
+    }
+
+    if (lastTime === null || Math.abs(current - lastTime) > STALL_EPSILON) {
+      lastTime = current;
+      lastProgressAt = now();
+      return;
+    }
+
+    if (now() - lastProgressAt < STALL_MS) return;
+
+    const cutoff = now() - STALL_WINDOW_MS;
+    recentNudges = recentNudges.filter((stamp) => stamp > cutoff);
+    if (recentNudges.length >= STALL_LIMIT) {
+      stallStopped = true;
+      log('nudged', STALL_LIMIT, 'times in a minute without recovering; stopping');
+      onStallGaveUp();
+      return;
+    }
+
+    log('playhead stuck at', current, 'for', now() - lastProgressAt, 'ms; nudging');
+    recentNudges.push(now());
+    // Restarted before the seek rather than after: the seek changes
+    // currentTime, and treating that change as progress would hide a nudge that
+    // achieved nothing.
+    lastProgressAt = now();
+    lastTime = null;
+    if (player.nudge(NUDGE_SECONDS) !== true) return;
+    unstickCount += 1;
+    onUnstuck();
+  }
+
   async function onEnded() {
     if (!enabled) return;
     // Without this the extension would walk through the whole course while the
@@ -210,6 +300,11 @@ function createResumer(options) {
   // Called when a new video element appears — a page load or a lesson change.
   function onVideoChanged() {
     rateSettleUntil = now() + RATE_SETTLE_MS;
+    // A new lesson is a fresh start: the previous one's playhead readings and
+    // its record of failed nudges say nothing about this one.
+    resetStall();
+    recentNudges = [];
+    stallStopped = false;
     restoreRate();
   }
 
@@ -224,6 +319,7 @@ function createResumer(options) {
     onPause,
     onEnded,
     onRateChange,
+    checkStall,
     checkModal,
     checkTextLesson,
     restoreRate,
@@ -258,6 +354,8 @@ function createResumer(options) {
       autoNextText,
       autoNextCount,
       autoNextStopped,
+      unstickCount,
+      stallStopped,
     }),
   };
 }
@@ -274,6 +372,11 @@ if (typeof window !== 'undefined') {
   window.__llAutoResume.RATE_SETTLE_MS = RATE_SETTLE_MS;
   window.__llAutoResume.AUTO_NEXT_LIMIT = AUTO_NEXT_LIMIT;
   window.__llAutoResume.AUTO_NEXT_WINDOW_MS = AUTO_NEXT_WINDOW_MS;
+  window.__llAutoResume.STALL_EPSILON = STALL_EPSILON;
+  window.__llAutoResume.STALL_MS = STALL_MS;
+  window.__llAutoResume.NUDGE_SECONDS = NUDGE_SECONDS;
+  window.__llAutoResume.STALL_LIMIT = STALL_LIMIT;
+  window.__llAutoResume.STALL_WINDOW_MS = STALL_WINDOW_MS;
 }
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
@@ -285,5 +388,10 @@ if (typeof module !== 'undefined' && module.exports) {
     RATE_SETTLE_MS,
     AUTO_NEXT_LIMIT,
     AUTO_NEXT_WINDOW_MS,
+    STALL_EPSILON,
+    STALL_MS,
+    NUDGE_SECONDS,
+    STALL_LIMIT,
+    STALL_WINDOW_MS,
   };
 }

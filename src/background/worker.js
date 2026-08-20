@@ -20,7 +20,7 @@ chrome.idle.setDetectionInterval(IDLE_DETECTION_SECONDS);
 // other causes and reloading on silence could loop.
 //
 // Keep this in step with CONTRACT in src/content/index.js.
-const CONTRACT = 2;
+const CONTRACT = 3;
 
 // A reload is only supposed to be needed once per tab. If the contract still
 // does not match afterwards then the assumption behind this whole mechanism is

@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { loadContentScript } from './load-content-script.js';
 import { createFakePlayer, createFakeClock, noSleep } from './fake-player.js';
 
-const { createResumer, RATE_SETTLE_MS } = loadContentScript('resumer.js');
+const { createResumer, RATE_SETTLE_MS, STALL_MS, NUDGE_SECONDS, STALL_LIMIT } =
+  loadContentScript('resumer.js');
 
 function setup(overrides = {}) {
   const player = createFakePlayer(overrides.player);
@@ -433,4 +434,199 @@ test('the watchdog reasserts the rate only while the player is settling', () => 
   player.rate = 1;
   resumer.keepRate();
   assert.equal(player.rate, 1, 'left alone afterwards');
+});
+
+
+// A buffer-gap stall: the playhead sits outside the buffered range, the player
+// never requests the missing segment, and `paused` stays false the whole time.
+// No pause, waiting, or stalled event fires, so the only way to see it is to
+// watch the clock. Everything below drives checkStall from a fake watchdog.
+const WATCHDOG_MS = 2000;
+
+function setupStall(overrides = {}) {
+  const events = { unstuck: 0, gaveUp: 0 };
+  const base = setup({
+    ...overrides,
+    resumer: {
+      onUnstuck: () => {
+        events.unstuck += 1;
+      },
+      onStallGaveUp: () => {
+        events.gaveUp += 1;
+      },
+      ...overrides.resumer,
+    },
+  });
+  base.player.paused = false;
+  base.player.currentTime = 100;
+  // Ticks the watchdog `count` times without the playhead moving.
+  base.stallFor = (count) => {
+    for (let i = 0; i < count; i += 1) {
+      base.clock.advance(WATCHDOG_MS);
+      base.resumer.checkStall();
+    }
+  };
+  return { ...base, events };
+}
+
+test('nudges the playhead once it has stood still past the stall threshold', () => {
+  const { player, events, stallFor } = setupStall();
+
+  stallFor(1);
+  assert.equal(player.nudges, 0, 'one tick is not yet a stall');
+
+  stallFor(2);
+
+  assert.equal(player.nudges, 1);
+  assert.equal(player.currentTime, 100 + NUDGE_SECONDS);
+  assert.equal(events.unstuck, 1);
+});
+
+test('leaves a playing video alone while the playhead keeps moving', () => {
+  const { player, clock, resumer } = setupStall();
+
+  for (let i = 0; i < 20; i += 1) {
+    clock.advance(WATCHDOG_MS);
+    player.currentTime += WATCHDOG_MS / 1000;
+    resumer.checkStall();
+  }
+
+  assert.equal(player.nudges, 0);
+});
+
+test('does not nudge a paused video', () => {
+  const { player, stallFor } = setupStall();
+  player.paused = true;
+
+  stallFor(5);
+
+  assert.equal(player.nudges, 0, 'a paused playhead is meant to stand still');
+});
+
+test('does not nudge a finished video', () => {
+  const { player, stallFor } = setupStall();
+  player.ended = true;
+
+  stallFor(5);
+
+  assert.equal(player.nudges, 0);
+});
+
+test('does not nudge a lesson with no video', () => {
+  const { player, stallFor } = setupStall();
+  player.video = false;
+
+  stallFor(5);
+
+  assert.equal(player.nudges, 0);
+});
+
+test('does not nudge when disabled', () => {
+  const { player, resumer, stallFor } = setupStall();
+  resumer.setEnabled(false);
+
+  stallFor(5);
+
+  assert.equal(player.nudges, 0);
+});
+
+test('does not nudge while the gate is closed', () => {
+  const { player, stallFor } = setupStall({ resumer: { canIntervene: () => false } });
+
+  stallFor(5);
+
+  assert.equal(player.nudges, 0);
+});
+
+test('counts the time waited, not the number of ticks', () => {
+  const { player, clock, resumer } = setupStall();
+
+  // One long gap — a throttled background tab — is as much of a stall as
+  // several short ones.
+  clock.advance(WATCHDOG_MS);
+  resumer.checkStall();
+  clock.advance(STALL_MS + 1);
+  resumer.checkStall();
+
+  assert.equal(player.nudges, 1);
+});
+
+test('waits the full threshold again after a nudge recovers playback', () => {
+  const { player, clock, resumer, stallFor } = setupStall();
+  stallFor(3);
+  assert.equal(player.nudges, 1);
+
+  // Playback resumes: the next tick sees the playhead moving again.
+  clock.advance(WATCHDOG_MS);
+  player.currentTime += WATCHDOG_MS / 1000;
+  resumer.checkStall();
+
+  stallFor(1);
+  assert.equal(player.nudges, 1, 'one tick after recovery is not a fresh stall');
+});
+
+test('nudges again when the same video stalls a second time', () => {
+  const { player, clock, resumer, stallFor, events } = setupStall();
+  stallFor(3);
+
+  clock.advance(WATCHDOG_MS);
+  player.currentTime += WATCHDOG_MS / 1000;
+  resumer.checkStall();
+
+  stallFor(3);
+
+  assert.equal(player.nudges, 2);
+  assert.equal(events.unstuck, 2);
+});
+
+test('gives up after nudging the limit of times without recovering', () => {
+  const { player, resumer, events, stallFor } = setupStall();
+  // A stall a seek cannot clear: the playhead never moves, nudge or not.
+  player.nudgeMovesPlayhead = false;
+
+  stallFor(60);
+
+  assert.equal(player.nudges, STALL_LIMIT);
+  assert.equal(events.gaveUp, 1, 'and says so exactly once');
+  assert.equal(resumer.getState().stallStopped, true);
+});
+
+test('a new lesson clears a giving-up decision', () => {
+  const { player, resumer, stallFor } = setupStall();
+  player.nudgeMovesPlayhead = false;
+  stallFor(60);
+  assert.equal(resumer.getState().stallStopped, true);
+
+  resumer.onVideoChanged();
+  player.nudgeMovesPlayhead = true;
+  stallFor(3);
+
+  assert.equal(player.nudges, STALL_LIMIT + 1, 'nudging resumes on the new lesson');
+  assert.equal(resumer.getState().stallStopped, false);
+});
+
+test('counts the stalls it has cleared', () => {
+  const { resumer, stallFor } = setupStall();
+
+  stallFor(3);
+
+  assert.equal(resumer.getState().unstickCount, 1);
+});
+
+test('does not nudge while the resume breaker is cooling down', async () => {
+  const { player, clock, resumer, stallFor } = setupStall();
+
+  for (let i = 0; i < 5; i += 1) {
+    player.paused = true;
+    await resumer.onPause();
+    clock.advance(1000);
+  }
+  player.paused = true;
+  await resumer.onPause();
+  assert.ok(resumer.getState().cooldownUntil > clock.now(), 'breaker tripped');
+
+  player.paused = false;
+  stallFor(3);
+
+  assert.equal(player.nudges, 0);
 });

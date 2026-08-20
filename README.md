@@ -27,6 +27,12 @@ nhỏ hiện lên báo cho bạn biết.
 Nó cũng bấm hộ những hộp thoại kiểu "Bạn còn xem không?", chuyển sang bài tiếp
 theo khi video hết, và giữ nguyên tốc độ phát bạn thích.
 
+Có một kiểu hỏng khác: video **đứng hình giữa chừng** nhưng vẫn tự cho là đang
+chạy — nút vẫn là Pause, không có báo lỗi nào, và nó nằm đó mãi. Bấm Play không
+ăn thua vì trình phát không hề nghĩ mình đang dừng. Extension nhận ra khi đồng
+hồ của video không nhích trong 3 giây và tua nhẹ một phần mười giây để trình phát
+tải lại đoạn còn thiếu. Bạn nghe tiếp sau khoảng một giây.
+
 **Nó không làm phiền khi bạn không nhìn màn hình.** Khoá máy, chuyển sang tab
 khác, thu nhỏ cửa sổ — extension nằm im. Chỉ khi bài học còn hiện trên màn hình
 nó mới can thiệp. Trường hợp nó sinh ra để phục vụ là: bạn đang làm việc ở ứng
@@ -44,7 +50,7 @@ Bấm vào biểu tượng extension khi đang mở một bài học.
 | | |
 |---|---|
 | **Đang bật / Đang tắt** | Trạng thái hiện tại, chấm xanh là đang chạy. |
-| **Tự động chạy lại video** | Công tắc chính. Bật sẵn. Bao gồm cả việc bấm hộ hộp thoại, chuyển bài khi hết video, và giữ tốc độ. |
+| **Tự động chạy lại video** | Công tắc chính. Bật sẵn. Bao gồm cả việc bấm hộ hộp thoại, gỡ video đứng hình, chuyển bài khi hết video, và giữ tốc độ. |
 | **Tự qua trang text** | *Tắt sẵn.* Xem mục dưới. |
 | **Tốc độ mặc định** | Tốc độ tối thiểu cho mọi bài. |
 | **Bật hết / Tắt hết** | Bật hoặc tắt cả hai công tắc bằng một nút. |
@@ -123,6 +129,14 @@ with a small note on screen so you know.
 It also clicks through "Are you still watching?" dialogs, moves to the next
 lesson when a video ends, and keeps your preferred playback speed.
 
+There is a second way this breaks: the video **freezes mid-lesson** while still
+reporting itself as playing — the button still says Pause, nothing reports an
+error, and it sits there indefinitely. Pressing Play does nothing, because the
+player does not believe it is stopped. The extension notices when the video's own
+clock has not moved for 3 seconds and nudges the playhead a tenth of a second so
+the player fetches the segment it is missing. Sound comes back after about a
+second.
+
 **It stays out of the way when you are not looking.** Lock the screen, switch to
 another tab, minimise the window — the extension does nothing. It only acts while
 the lesson is actually on screen. The case it exists for is this one: you are
@@ -141,7 +155,7 @@ here is what each control means.
 | | |
 |---|---|
 | **Đang bật / Đang tắt** | On / Off. A green dot means it is running. |
-| **Tự động chạy lại video** | *Restart video automatically.* The main switch, on by default. Covers the dialogs, moving to the next lesson, and holding the speed. |
+| **Tự động chạy lại video** | *Restart video automatically.* The main switch, on by default. Covers the dialogs, unfreezing a stuck video, moving to the next lesson, and holding the speed. |
 | **Tự qua trang text** | *Skip text pages automatically.* **Off by default** — see below. |
 | **Tốc độ mặc định** | *Default speed.* The slowest any lesson will play. |
 | **Bật hết / Tắt hết** | *All on / All off.* Flips both switches at once. |

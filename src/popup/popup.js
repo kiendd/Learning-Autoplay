@@ -6,6 +6,7 @@ const all = document.getElementById('all');
 const rate = document.getElementById('rate');
 const count = document.getElementById('count');
 const nextCount = document.getElementById('next-count');
+const unstickCount = document.getElementById('unstick-count');
 const note = document.getElementById('note');
 
 const STALE = 'Trang đang chạy bản cũ của extension — hãy tải lại trang (F5).';
@@ -43,6 +44,7 @@ function render(state) {
   renderStatus();
   count.textContent = String(state.resumeCount || 0);
   nextCount.textContent = String(state.autoNextCount || 0);
+  unstickCount.textContent = String(state.unstickCount || 0);
   // A speed set on the page rather than here may not be one of the listed
   // options, so keep the raw value visible instead of silently snapping to 1×.
   if (typeof state.rate === 'number' && state.rate > 0) {
@@ -56,6 +58,8 @@ function render(state) {
 
   if (state.blocked) {
     note.textContent = 'Chrome đang chặn tự phát — bấm vào trang một lần.';
+  } else if (state.stallStopped) {
+    note.textContent = 'Video kẹt liên tục, đã ngừng gỡ. Hãy tải lại trang (F5).';
   } else if (state.autoNextStopped) {
     note.textContent = 'Tự qua trang đã dừng vì chuyển quá nhanh. Tắt/bật lại để tiếp tục.';
   } else {

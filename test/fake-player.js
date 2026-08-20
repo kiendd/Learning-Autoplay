@@ -32,8 +32,22 @@ export function createFakePlayer(overrides = {}) {
       };
     },
 
+    // Stall state: the playhead, and a count of how often it was nudged.
+    currentTime: 0,
+    nudges: 0,
+    // Set false to model a stall a seek does not clear — the playhead stays put
+    // even after the nudge.
+    nudgeMovesPlayhead: true,
+
     isPaused: () => player.paused,
     isEnded: () => player.ended,
+    getCurrentTime: () => (player.video ? player.currentTime : null),
+    nudge(seconds) {
+      if (!player.video) return false;
+      player.nudges += 1;
+      if (player.nudgeMovesPlayhead) player.currentTime += seconds;
+      return true;
+    },
     async play() {
       player.playCalls += 1;
       if (player.playRejections > 0) {
